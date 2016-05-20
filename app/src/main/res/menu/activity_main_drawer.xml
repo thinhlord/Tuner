@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <group android:id="@+id/group1" android:checkableBehavior="none">
+        <item
+            android:id="@+id/nav_camera"
+            android:title="Notification Sound" />
+        <item
+            android:id="@+id/nav_gallery"
+            android:title="Top 2016" />
+        <item
+            android:id="@+id/nav_slideshow"
+            android:title="Funny" />
+        <item
+            android:id="@+id/nav_manage"
+            android:title="Alarm Clock" />
+        <item
+            android:id="@+id/nav_d"
+            android:title="Animal Sound" />
+        <item
+            android:id="@+id/nav_ma"
+            android:title="Romantic" />
+        <item
+            android:id="@+id/nav_mege"
+            android:title="Promo" />
+    </group>
+
+    <group android:id="@+id/group2" android:checkableBehavior="none" >
+        <item
+            android:id="@+id/nav_share"
+            android:icon="@drawable/info"
+            android:title="About tuner" />
+    </group>
+
+</menu>
