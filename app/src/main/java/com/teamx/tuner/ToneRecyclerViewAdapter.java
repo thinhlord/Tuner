@@ -1,6 +1,5 @@
 package com.teamx.tuner;
 
-import android.graphics.Color;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -42,8 +41,6 @@ public class ToneRecyclerViewAdapter extends RecyclerView.Adapter<ToneRecyclerVi
                 }
             }
         });
-        holder.progressBar.getIndeterminateDrawable().setColorFilter(
-                Color.RED, android.graphics.PorterDuff.Mode.SRC_IN);
         holder.playButton.setImageResource(holder.mItem.on ? R.drawable.play_on : R.drawable.play_off);
         holder.playButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -54,6 +51,7 @@ public class ToneRecyclerViewAdapter extends RecyclerView.Adapter<ToneRecyclerVi
                 }
             }
         });
+        holder.progressBar.setProgress(holder.mItem.progress);
     }
 
     @Override

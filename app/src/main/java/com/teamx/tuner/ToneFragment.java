@@ -13,7 +13,6 @@ import android.text.Html;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.pkmmte.pkrss.Article;
@@ -24,7 +23,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
-public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPreparedListener, MediaPlayer.OnErrorListener {
+public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPreparedListener, MediaPlayer.OnErrorListener, MediaPlayer.OnCompletionListener {
 
     Context context;
     RecyclerView recyclerView;
@@ -103,6 +102,7 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
                 if (!tone.url.contains(".mp3")) tone.url = null;
             }
             tone.on = false;
+            tone.progress = 0;
             if (tone.url != null) toneList.add(tone);
         }
         adapter = new ToneRecyclerViewAdapter(toneList, new OnListFragmentInteractionListener() {
@@ -116,10 +116,7 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
             @Override
             public void onPlayClick(Tone item, int position) {
                 if (pos != -1) {
-                    ProgressBar nowPlayingProgressBar = (
-                            (ToneRecyclerViewAdapter.ViewHolder) recyclerView.findViewHolderForAdapterPosition(pos))
-                            .progressBar;
-                    nowPlayingProgressBar.setProgress(0);
+                    toneList.get(pos).progress = 0;
                 }
                 if (item.on) {
                     for (Tone tone : toneList) if (!item.equals(tone) && tone.on) tone.on = false;
@@ -133,6 +130,7 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
                     mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
                     mediaPlayer.setOnPreparedListener(ToneFragment.this);
                     mediaPlayer.setOnErrorListener(ToneFragment.this);
+                    mediaPlayer.setOnCompletionListener(ToneFragment.this);
                     try {
                         mediaPlayer.setDataSource(item.url);
                     } catch (IOException e) {
@@ -180,11 +178,8 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
 
     private void progressBarUpdater() {
         if (mediaPlayer != null && mediaPlayer.isPlaying()) {
-            ProgressBar nowPlayingProgressBar = (
-                    (ToneRecyclerViewAdapter.ViewHolder) recyclerView.findViewHolderForAdapterPosition(pos))
-                    .progressBar;
-
-            nowPlayingProgressBar.setProgress((int) (((float) mediaPlayer.getCurrentPosition() / mediaPlayer.getDuration()) * 100));
+            toneList.get(pos).progress = (int) (((float) mediaPlayer.getCurrentPosition() / mediaPlayer.getDuration()) * 100);
+            adapter.notifyDataSetChanged();
             Runnable notification = new Runnable() {
                 public void run() {
                     progressBarUpdater();
@@ -192,6 +187,15 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
             };
             new Handler().postDelayed(notification, 1000);
         }
+    }
+
+    @Override
+    public void onCompletion(MediaPlayer mp) {
+        mediaPlayer.release();
+        mediaPlayer = null;
+        toneList.get(pos).on = false;
+        toneList.get(pos).progress = 0;
+        adapter.notifyDataSetChanged();
     }
 
     public interface OnListFragmentInteractionListener {

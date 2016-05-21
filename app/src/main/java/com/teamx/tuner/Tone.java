@@ -10,6 +10,7 @@ public class Tone implements Serializable {
     public String name;
     public String url;
     public boolean on;
+    public int progress;
 
     @Override
     public boolean equals(Object o) {
