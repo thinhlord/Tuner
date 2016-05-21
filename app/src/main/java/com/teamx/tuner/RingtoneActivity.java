@@ -1,7 +1,10 @@
 package com.teamx.tuner;
 
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
@@ -14,6 +17,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.webkit.MimeTypeMap;
 import android.widget.Toast;
 
 import java.io.File;
@@ -25,6 +29,17 @@ import java.net.URL;
 public class RingtoneActivity extends BaseActivity implements NavigationView.OnNavigationItemSelectedListener {
 
     Tone tone = null;
+
+    public static Intent getOpenFileIntent(String path) {
+        File file = new File(path);
+        Uri uri = Uri.fromFile(file);
+        MimeTypeMap mime = MimeTypeMap.getSingleton();
+        String extension = path.substring(path.lastIndexOf('.') + 1);
+        String type = mime.getMimeTypeFromExtension(extension);
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setDataAndType(uri, type);
+        return intent;
+    }
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -46,11 +61,12 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
             @Override
             public void onClick(View v) {
                 String filename = tone.url.substring(tone.url.lastIndexOf('/') + 1);
-                File f = new File(filename);
+                String storeDir = Environment.getExternalStorageDirectory().toString() + "/Tuner/Ringtone";
+                File f = new File(storeDir, filename);
+                Log.d("Path", f.getAbsolutePath());
                 if (f.exists()) {
                     Toast.makeText(RingtoneActivity.this, "Ringtone already downloaded", Toast.LENGTH_SHORT).show();
-                }
-                else new DownloadFileTask().execute(tone.url);
+                } else new DownloadFileTask().execute(tone.url);
             }
         });
     }
@@ -110,6 +126,7 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
     private class DownloadFileTask extends AsyncTask<String, Integer, Void> {
         NotificationManager mNotifyManager;
         NotificationCompat.Builder mBuilder;
+        String path;
 
         protected void onPreExecute() {
             super.onPreExecute();
@@ -137,7 +154,8 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
                         InputStream is = con.getInputStream();
                         String pathr = url.getPath();
                         String filename = pathr.substring(pathr.lastIndexOf('/') + 1);
-                        FileOutputStream fos = new FileOutputStream(storeDir + "/" + filename);
+                        path = storeDir + "/" + filename;
+                        FileOutputStream fos = new FileOutputStream(path);
                         int lenghtOfFile = con.getContentLength();
                         byte data[] = new byte[1024];
                         long total = 0;
@@ -180,6 +198,11 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
         protected void onPostExecute(Void result) {
             mBuilder.setContentText("Download complete");
             mBuilder.setProgress(0, 0, false);
+            if (path != null && !path.isEmpty()) {
+                PendingIntent contentIntent = PendingIntent.getActivity(
+                        RingtoneActivity.this, 0, getOpenFileIntent(path), PendingIntent.FLAG_CANCEL_CURRENT);
+                mBuilder.setContentIntent(contentIntent);
+            }
             mNotifyManager.notify(0, mBuilder.build());
         }
 
