@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Bundle;
+import android.os.Handler;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -12,6 +13,7 @@ import android.text.Html;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ProgressBar;
 import android.widget.Toast;
 
 import com.pkmmte.pkrss.Article;
@@ -30,6 +32,7 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
     ToneRecyclerViewAdapter adapter;
     View loadingView;
     MediaPlayer mediaPlayer;
+    int pos = -1;
 
     public ToneFragment() {
     }
@@ -74,7 +77,6 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
     public void onAttach(Context context) {
         super.onAttach(context);
         this.context = context;
-
     }
 
     @Override
@@ -112,13 +114,25 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
             }
 
             @Override
-            public void onPlayClick(Tone item) {
+            public void onPlayClick(Tone item, int position) {
+                if (pos != -1) {
+                    ProgressBar nowPlayingProgressBar = (
+                            (ToneRecyclerViewAdapter.ViewHolder) recyclerView.findViewHolderForAdapterPosition(pos))
+                            .progressBar;
+                    nowPlayingProgressBar.setProgress(0);
+                }
                 if (item.on) {
                     for (Tone tone : toneList) if (!item.equals(tone) && tone.on) tone.on = false;
-                    // play music
-                    Toast.makeText(context, item.url, Toast.LENGTH_LONG).show();
+                    if (mediaPlayer != null) {
+                        mediaPlayer.stop();
+                        mediaPlayer.release();
+                    }
+
+                    pos = position;
                     mediaPlayer = new MediaPlayer();
                     mediaPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+                    mediaPlayer.setOnPreparedListener(ToneFragment.this);
+                    mediaPlayer.setOnErrorListener(ToneFragment.this);
                     try {
                         mediaPlayer.setDataSource(item.url);
                     } catch (IOException e) {
@@ -161,12 +175,28 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
     @Override
     public void onPrepared(MediaPlayer mp) {
         mediaPlayer.start();
+        progressBarUpdater();
+    }
+
+    private void progressBarUpdater() {
+        if (mediaPlayer != null && mediaPlayer.isPlaying()) {
+            ProgressBar nowPlayingProgressBar = (
+                    (ToneRecyclerViewAdapter.ViewHolder) recyclerView.findViewHolderForAdapterPosition(pos))
+                    .progressBar;
+
+            nowPlayingProgressBar.setProgress((int) (((float) mediaPlayer.getCurrentPosition() / mediaPlayer.getDuration()) * 100));
+            Runnable notification = new Runnable() {
+                public void run() {
+                    progressBarUpdater();
+                }
+            };
+            new Handler().postDelayed(notification, 1000);
+        }
     }
 
     public interface OnListFragmentInteractionListener {
         void onAddToneClick(Tone item);
-        void onPlayClick(Tone item);
+
+        void onPlayClick(Tone item, int position);
     }
-
-
 }

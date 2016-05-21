@@ -1,10 +1,12 @@
 package com.teamx.tuner;
 
+import android.graphics.Color;
 import android.support.v7.widget.RecyclerView;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.ProgressBar;
 import android.widget.TextView;
 
 import com.teamx.tuner.ToneFragment.OnListFragmentInteractionListener;
@@ -40,13 +42,15 @@ public class ToneRecyclerViewAdapter extends RecyclerView.Adapter<ToneRecyclerVi
                 }
             }
         });
+        holder.progressBar.getIndeterminateDrawable().setColorFilter(
+                Color.RED, android.graphics.PorterDuff.Mode.SRC_IN);
         holder.playButton.setImageResource(holder.mItem.on ? R.drawable.play_on : R.drawable.play_off);
         holder.playButton.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 if (null != mListener) {
                     holder.mItem.on = !holder.mItem.on;
-                    mListener.onPlayClick(holder.mItem);
+                    mListener.onPlayClick(holder.mItem, holder.getAdapterPosition());
                 }
             }
         });
@@ -63,6 +67,7 @@ public class ToneRecyclerViewAdapter extends RecyclerView.Adapter<ToneRecyclerVi
         public Tone mItem;
         public ImageView addButton;
         public ImageView playButton;
+        public ProgressBar progressBar;
 
         public ViewHolder(View view) {
             super(view);
@@ -70,6 +75,7 @@ public class ToneRecyclerViewAdapter extends RecyclerView.Adapter<ToneRecyclerVi
             name = (TextView) view.findViewById(R.id.name);
             addButton = (ImageView) view.findViewById(R.id.add_button);
             playButton = (ImageView) view.findViewById(R.id.play_button);
+            progressBar = (ProgressBar) view.findViewById(R.id.progressBar);
         }
 
         @Override
