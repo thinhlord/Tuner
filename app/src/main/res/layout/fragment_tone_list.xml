@@ -2,31 +2,59 @@
 <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
-    android:background="@color/grey_divider"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/grey_divider">
 
     <android.support.v7.widget.RecyclerView
         android:id="@+id/list"
         android:name="com.teamx.tuner.ToneFragment"
         android:layout_width="match_parent"
         android:layout_height="match_parent"
+        android:layout_above="@+id/adView"
         app:layoutManager="LinearLayoutManager"
         tools:context="com.teamx.tuner.ToneFragment"
-        tools:listitem="@layout/fragment_tone"
-        android:layout_above="@+id/adView" />
+        tools:listitem="@layout/fragment_tone" />
 
     <ProgressBar
         android:id="@+id/loading"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_gravity="center"
-        android:indeterminate="true"
+        android:layout_centerHorizontal="true"
         android:layout_centerVertical="true"
-        android:layout_centerHorizontal="true" />
+        android:layout_gravity="center"
+        android:indeterminate="true" />
 
-    <include layout="@layout/ads_view"
-        android:id="@+id/adView" />
+    <LinearLayout
+        android:gravity="center"
+        android:id="@+id/empty"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:layout_centerHorizontal="true"
+        android:layout_centerVertical="true">
+
+        <TextView
+            android:layout_marginBottom="10dp"
+            android:textStyle="bold"
+            android:textSize="20sp"
+            android:textColor="@android:color/holo_red_dark"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="No network connection" />
+
+        <Button
+            style="@android:style/Widget.Holo.Button"
+            android:id="@+id/retry"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Retry" />
+    </LinearLayout>
+
+
+    <include
+        android:id="@+id/adView"
+        layout="@layout/ads_view" />
 
 </RelativeLayout>
 

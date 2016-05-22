@@ -6,10 +6,13 @@ import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
 import android.media.RingtoneManager;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.ContactsContract;
 import android.provider.MediaStore;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
@@ -22,6 +25,9 @@ import android.view.MenuItem;
 import android.view.View;
 import android.widget.Toast;
 
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.AdView;
+
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
@@ -31,12 +37,14 @@ import java.net.URL;
 public class RingtoneActivity extends BaseActivity implements NavigationView.OnNavigationItemSelectedListener {
 
     public static final int NOTIFICATION_ID = 342;
-    public static final int TYPE_CONTACT = 3;
+    public static final int TYPE_CONTACT = 1975;
+    public static final int TYPE_DOWNLOAD = 1945;
+    static final int PICK_CONTACT_REQUEST = 1;
 
+    static boolean downloading = false;
     Tone tone = null;
     String storeDir = Environment.getExternalStorageDirectory().toString() + "/Tuner/Ringtone";
     boolean showDownloadDone = true;
-    static boolean downloading = false;
 
     public Intent getOpenFileIntent() {
         Uri uri = Uri.parse(storeDir + File.pathSeparator + tone.filename);
@@ -52,6 +60,11 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
         setContentView(R.layout.activity_ringtone);
 
         tone = (Tone) getIntent().getSerializableExtra("Tone");
+
+        AdView adView = (AdView) findViewById(R.id.adView);
+        AdRequest adRequest = new AdRequest.Builder()
+                .setRequestAgent("android_studio:ad_template").build();
+        adView.loadAd(adRequest);
 
         DrawerLayout drawer = (DrawerLayout) findViewById(R.id.drawer_layout);
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
@@ -86,36 +99,14 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
         findViewById(R.id.set_contact).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                File f = new File(storeDir, tone.filename);
-                if (f.exists()) {
-                    setRingtone(tone, TYPE_CONTACT);
-                } else {
-                    showDownloadDone = false;
-                    DownloadFileTask task = new DownloadFileTask();
-                    task.callback = new TaskCompleteCallback() {
-                        @Override
-                        public void onComplete() {
-                            setRingtone(tone, TYPE_CONTACT);
-                        }
-                    };
-                    task.execute(tone);
-                }
+                checkAndSetRingtone(TYPE_CONTACT);
             }
         });
 
         findViewById(R.id.download).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                if (downloading) {
-                    Toast.makeText(RingtoneActivity.this, "Please wait for the download complete first", Toast.LENGTH_SHORT).show();
-                }
-                File f = new File(storeDir, tone.filename);
-                if (f.exists()) {
-                    Toast.makeText(RingtoneActivity.this, "Ringtone already downloaded", Toast.LENGTH_SHORT).show();
-                } else {
-                    showDownloadDone = true;
-                    new DownloadFileTask().execute(tone);
-                }
+                checkAndSetRingtone(TYPE_DOWNLOAD);
             }
         });
     }
@@ -125,10 +116,14 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
             Toast.makeText(RingtoneActivity.this, "Please wait for the download complete first", Toast.LENGTH_SHORT).show();
             return;
         }
+        if (!isNetworkAvailable()) {
+            Toast.makeText(RingtoneActivity.this, "No network connection", Toast.LENGTH_SHORT).show();
+            return;
+        }
         File f = new File(storeDir, tone.filename);
         if (f.exists()) {
             setRingtone(tone, type);
-        } else {
+        } else if (type != TYPE_DOWNLOAD){
             showDownloadDone = false;
             DownloadFileTask task = new DownloadFileTask();
             task.callback = new TaskCompleteCallback() {
@@ -138,10 +133,20 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
                 }
             };
             task.execute(tone);
+        } else {
+            showDownloadDone = true;
+            new DownloadFileTask().execute(tone);
         }
     }
 
     protected void setRingtone(Tone tone, int type) {
+        if (type == TYPE_CONTACT) {
+            Toast.makeText(RingtoneActivity.this, "Select your contact", Toast.LENGTH_SHORT).show();
+            Intent pickContactIntent = new Intent(Intent.ACTION_PICK, Uri.parse("content://contacts"));
+            pickContactIntent.setType(ContactsContract.CommonDataKinds.Phone.CONTENT_TYPE);
+            startActivityForResult(pickContactIntent, PICK_CONTACT_REQUEST);
+            return;
+        }
         File file = new File(storeDir, tone.filename);
         ContentValues values = new ContentValues();
         values.put(MediaStore.MediaColumns.DATA, file.getAbsolutePath());
@@ -157,7 +162,7 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
         Uri uri = MediaStore.Audio.Media.getContentUriForPath(file.getAbsolutePath());
         Uri newUri = this.getContentResolver().insert(uri, values);
 
-        if (type != TYPE_CONTACT) RingtoneManager.setActualDefaultRingtoneUri(
+        RingtoneManager.setActualDefaultRingtoneUri(
                 this,
                 type,
                 newUri
@@ -171,9 +176,6 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
                 break;
             case RingtoneManager.TYPE_NOTIFICATION:
                 Toast.makeText(RingtoneActivity.this, String.format("Set %s as notification ringtone", tone.name), Toast.LENGTH_SHORT).show();
-                break;
-            case TYPE_CONTACT:
-                Toast.makeText(RingtoneActivity.this, String.format("Set %s as contact ringtone", tone.name), Toast.LENGTH_SHORT).show();
                 break;
         }
     }
@@ -229,6 +231,29 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
         } else {
             super.onBackPressed();
         }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == PICK_CONTACT_REQUEST) {
+            if (resultCode == RESULT_OK) {
+                Uri contactUri = data.getData();
+                File file = new File(storeDir, tone.filename);
+                String value = Uri.fromFile(file).toString();
+                ContentValues values = new ContentValues(1);
+                values.put(ContactsContract.Contacts.CUSTOM_RINGTONE, value);
+                getContentResolver().update(contactUri, values, null, null);
+                Toast.makeText(RingtoneActivity.this, String.format("Set %s as contact ringtone", tone.name), Toast.LENGTH_SHORT).show();
+
+            }
+        }
+    }
+
+    private boolean isNetworkAvailable() {
+        ConnectivityManager connectivityManager
+                = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
     }
 
     interface TaskCompleteCallback {
@@ -308,19 +333,21 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
         }
 
         protected void onPostExecute(Boolean result) {
-            if (showDownloadDone) {
-                mBuilder.setContentText("Download complete");
-                mBuilder.setProgress(0, 0, false);
-                if (result) {
+            if (result) {
+                if (showDownloadDone) {
+                    mBuilder.setContentText("Download complete");
+                    mBuilder.setProgress(0, 0, false);
                     PendingIntent contentIntent = PendingIntent.getActivity(
                             RingtoneActivity.this, 0, getOpenFileIntent(), PendingIntent.FLAG_CANCEL_CURRENT);
                     mBuilder.setContentIntent(contentIntent);
-
+                    mNotifyManager.notify(NOTIFICATION_ID, mBuilder.build());
+                } else {
+                    mNotifyManager.cancel(NOTIFICATION_ID);
+                    if (callback != null) callback.onComplete();
                 }
-                mNotifyManager.notify(NOTIFICATION_ID, mBuilder.build());
             } else {
                 mNotifyManager.cancel(NOTIFICATION_ID);
-                if (callback != null) callback.onComplete();
+                Toast.makeText(RingtoneActivity.this, "No network connection", Toast.LENGTH_SHORT).show();
             }
             downloading = false;
         }

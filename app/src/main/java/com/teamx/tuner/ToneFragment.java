@@ -4,6 +4,8 @@ import android.content.Context;
 import android.content.Intent;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Handler;
 import android.support.v4.app.Fragment;
@@ -34,6 +36,7 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
     View loadingView;
     MediaPlayer mediaPlayer;
     int pos = -1;
+    View emptyView;
 
     public ToneFragment() {
     }
@@ -63,11 +66,24 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
         Context context = view.getContext();
         recyclerView.setLayoutManager(new LinearLayoutManager(context));
         loadingView = view.findViewById(R.id.loading);
+        emptyView = view.findViewById(R.id.empty);
+        view.findViewById(R.id.retry).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                loading();
+            }
+        });
         AdView adView = (AdView) view.findViewById(R.id.adView);
         AdRequest adRequest = new AdRequest.Builder()
                 .setRequestAgent("android_studio:ad_template").build();
         adView.loadAd(adRequest);
         return view;
+    }
+
+    protected void loading() {
+        emptyView.setVisibility(View.GONE);
+        loadingView.setVisibility(View.VISIBLE);
+        PkRSS.with(context).load("http://megascripts.com/radio/?feed=rss2&amp%3Bcat=1").callback(this).async();
     }
 
 
@@ -78,6 +94,16 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
         if (context != null) {
             PkRSS.with(context).load("http://megascripts.com/radio/?feed=rss2&amp%3Bcat=1").callback(this).async();
         }
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+        for (Tone t : toneList) {
+            t.on = false;
+            t.progress = 0;
+        }
+        if (adapter != null) adapter.notifyDataSetChanged();
     }
 
     @Override
@@ -155,7 +181,8 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
 
     @Override
     public void onLoadFailed() {
-
+        emptyView.setVisibility(View.VISIBLE);
+        loadingView.setVisibility(View.GONE);
     }
 
     @Override
@@ -205,5 +232,12 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
         void onAddToneClick(Tone item);
 
         void onPlayClick(Tone item, int position);
+    }
+
+    private boolean isNetworkAvailable() {
+        ConnectivityManager connectivityManager
+                = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
+        return activeNetworkInfo != null && activeNetworkInfo.isConnected();
     }
 }
