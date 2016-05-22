@@ -9,6 +9,7 @@ import java.io.Serializable;
 public class Tone implements Serializable {
     public String name;
     public String url;
+    public String filename;
     public boolean on;
     public int progress;
 

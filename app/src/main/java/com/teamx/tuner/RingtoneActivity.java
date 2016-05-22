@@ -2,12 +2,15 @@ package com.teamx.tuner;
 
 import android.app.NotificationManager;
 import android.app.PendingIntent;
+import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.media.RingtoneManager;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.Environment;
+import android.provider.MediaStore;
 import android.support.design.widget.NavigationView;
 import android.support.v4.view.GravityCompat;
 import android.support.v4.widget.DrawerLayout;
@@ -17,7 +20,6 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
-import android.webkit.MimeTypeMap;
 import android.widget.Toast;
 
 import java.io.File;
@@ -28,19 +30,22 @@ import java.net.URL;
 
 public class RingtoneActivity extends BaseActivity implements NavigationView.OnNavigationItemSelectedListener {
 
-    Tone tone = null;
+    public static final int NOTIFICATION_ID = 342;
+    public static final int TYPE_CONTACT = 3;
 
-    public static Intent getOpenFileIntent(String path) {
-        File file = new File(path);
-        Uri uri = Uri.fromFile(file);
-        MimeTypeMap mime = MimeTypeMap.getSingleton();
-        String extension = path.substring(path.lastIndexOf('.') + 1);
-        String type = mime.getMimeTypeFromExtension(extension);
-        Intent intent = new Intent(Intent.ACTION_VIEW);
-        intent.setDataAndType(uri, type);
+    Tone tone = null;
+    String storeDir = Environment.getExternalStorageDirectory().toString() + "/Tuner/Ringtone";
+    boolean showDownloadDone = true;
+    static boolean downloading = false;
+
+    public Intent getOpenFileIntent() {
+        Uri uri = Uri.parse(storeDir + File.pathSeparator + tone.filename);
+        Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+        intent.setDataAndType(uri, "file/*");
         return intent;
     }
 
+    @SuppressWarnings("ConstantConditions")
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -57,19 +62,122 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
         NavigationView navigationView = (NavigationView) findViewById(R.id.nav_view);
         navigationView.setNavigationItemSelectedListener(this);
 
+        findViewById(R.id.set_ringtone).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                checkAndSetRingtone(RingtoneManager.TYPE_RINGTONE);
+            }
+        });
+
+        findViewById(R.id.set_alarm).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                checkAndSetRingtone(RingtoneManager.TYPE_ALARM);
+            }
+        });
+
+        findViewById(R.id.set_noti).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                checkAndSetRingtone(RingtoneManager.TYPE_NOTIFICATION);
+            }
+        });
+
+        findViewById(R.id.set_contact).setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                File f = new File(storeDir, tone.filename);
+                if (f.exists()) {
+                    setRingtone(tone, TYPE_CONTACT);
+                } else {
+                    showDownloadDone = false;
+                    DownloadFileTask task = new DownloadFileTask();
+                    task.callback = new TaskCompleteCallback() {
+                        @Override
+                        public void onComplete() {
+                            setRingtone(tone, TYPE_CONTACT);
+                        }
+                    };
+                    task.execute(tone);
+                }
+            }
+        });
+
         findViewById(R.id.download).setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                String filename = tone.url.substring(tone.url.lastIndexOf('/') + 1);
-                String storeDir = Environment.getExternalStorageDirectory().toString() + "/Tuner/Ringtone";
-                File f = new File(storeDir, filename);
-                Log.d("Path", f.getAbsolutePath());
+                if (downloading) {
+                    Toast.makeText(RingtoneActivity.this, "Please wait for the download complete first", Toast.LENGTH_SHORT).show();
+                }
+                File f = new File(storeDir, tone.filename);
                 if (f.exists()) {
                     Toast.makeText(RingtoneActivity.this, "Ringtone already downloaded", Toast.LENGTH_SHORT).show();
-                } else new DownloadFileTask().execute(tone.url);
+                } else {
+                    showDownloadDone = true;
+                    new DownloadFileTask().execute(tone);
+                }
             }
         });
     }
+
+    protected void checkAndSetRingtone(final int type) {
+        if (downloading) {
+            Toast.makeText(RingtoneActivity.this, "Please wait for the download complete first", Toast.LENGTH_SHORT).show();
+            return;
+        }
+        File f = new File(storeDir, tone.filename);
+        if (f.exists()) {
+            setRingtone(tone, type);
+        } else {
+            showDownloadDone = false;
+            DownloadFileTask task = new DownloadFileTask();
+            task.callback = new TaskCompleteCallback() {
+                @Override
+                public void onComplete() {
+                    setRingtone(tone, type);
+                }
+            };
+            task.execute(tone);
+        }
+    }
+
+    protected void setRingtone(Tone tone, int type) {
+        File file = new File(storeDir, tone.filename);
+        ContentValues values = new ContentValues();
+        values.put(MediaStore.MediaColumns.DATA, file.getAbsolutePath());
+        values.put(MediaStore.MediaColumns.TITLE, tone.filename);
+        values.put(MediaStore.MediaColumns.SIZE, file.length());
+        values.put(MediaStore.MediaColumns.MIME_TYPE, "audio/*");
+        values.put(MediaStore.Audio.Media.IS_RINGTONE, type == RingtoneManager.TYPE_RINGTONE);
+        values.put(MediaStore.Audio.Media.IS_NOTIFICATION, type == RingtoneManager.TYPE_NOTIFICATION);
+        values.put(MediaStore.Audio.Media.IS_ALARM, type == RingtoneManager.TYPE_ALARM);
+        values.put(MediaStore.Audio.Media.ARTIST, "Tuner");
+
+        //Insert it into the database
+        Uri uri = MediaStore.Audio.Media.getContentUriForPath(file.getAbsolutePath());
+        Uri newUri = this.getContentResolver().insert(uri, values);
+
+        if (type != TYPE_CONTACT) RingtoneManager.setActualDefaultRingtoneUri(
+                this,
+                type,
+                newUri
+        );
+        switch (type) {
+            case RingtoneManager.TYPE_RINGTONE:
+                Toast.makeText(RingtoneActivity.this, String.format("Set %s as default ringtone", tone.name), Toast.LENGTH_SHORT).show();
+                break;
+            case RingtoneManager.TYPE_ALARM:
+                Toast.makeText(RingtoneActivity.this, String.format("Set %s as alarm ringtone", tone.name), Toast.LENGTH_SHORT).show();
+                break;
+            case RingtoneManager.TYPE_NOTIFICATION:
+                Toast.makeText(RingtoneActivity.this, String.format("Set %s as notification ringtone", tone.name), Toast.LENGTH_SHORT).show();
+                break;
+            case TYPE_CONTACT:
+                Toast.makeText(RingtoneActivity.this, String.format("Set %s as contact ringtone", tone.name), Toast.LENGTH_SHORT).show();
+                break;
+        }
+    }
+
 
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
@@ -123,46 +231,53 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
         }
     }
 
-    private class DownloadFileTask extends AsyncTask<String, Integer, Void> {
+    interface TaskCompleteCallback {
+        void onComplete();
+    }
+
+    private class DownloadFileTask extends AsyncTask<Tone, Integer, Boolean> {
         NotificationManager mNotifyManager;
         NotificationCompat.Builder mBuilder;
-        String path;
+        TaskCompleteCallback callback;
 
         protected void onPreExecute() {
             super.onPreExecute();
+            downloading = true;
             mNotifyManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
             mBuilder = new NotificationCompat.Builder(RingtoneActivity.this);
             mBuilder.setContentTitle("Tuner")
-                    .setContentText("Download in progress")
+                    .setContentText("Download in progress...")
                     .setSmallIcon(R.mipmap.ic_launcher);
             Toast.makeText(RingtoneActivity.this,
-                    "Downloading the ringtone... The download progress is on notification bar.", Toast.LENGTH_LONG).show();
-
+                    "Downloading the ringtone... The download progress is on notification bar.", Toast.LENGTH_SHORT).show();
         }
 
-        protected Void doInBackground(String... params) {
+        protected Boolean doInBackground(Tone... params) {
             URL url;
             int count;
-            String storeDir = Environment.getExternalStorageDirectory().toString() + "/Tuner/Ringtone";
 
             try {
-                url = new URL(params[0]);
+                url = new URL(tone.url);
                 try {
-                    File f = new File(storeDir);
-                    if ((f.mkdirs() || f.isDirectory())) {
+                    File file = new File(storeDir);
+                    if ((file.mkdirs() || file.isDirectory())) {
                         HttpURLConnection con = (HttpURLConnection) url.openConnection();
                         InputStream is = con.getInputStream();
-                        String pathr = url.getPath();
-                        String filename = pathr.substring(pathr.lastIndexOf('/') + 1);
-                        path = storeDir + "/" + filename;
+                        String path = storeDir + "/" + tone.filename;
+                        Log.d("Path", path);
                         FileOutputStream fos = new FileOutputStream(path);
-                        int lenghtOfFile = con.getContentLength();
+                        int lengthOfFile = con.getContentLength();
                         byte data[] = new byte[1024];
                         long total = 0;
+                        int progressDone = -1;
                         while ((count = is.read(data)) != -1) {
                             total += count;
                             // publishing the progress
-                            publishProgress((int) ((total * 100) / lenghtOfFile));
+                            int progress = (int) ((total * 100) / lengthOfFile);
+                            if (progress != progressDone && progress % 10 == 0) {
+                                progressDone = progress;
+                                publishProgress(progress);
+                            }
                             // writing data to output file
                             fos.write(data, 0, count);
                         }
@@ -170,41 +285,44 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
                         is.close();
                         fos.flush();
                         fos.close();
+                        return true;
                     } else {
                         Log.e("Error", "Not found: " + storeDir);
-
+                        return false;
                     }
 
                 } catch (Exception e) {
                     e.printStackTrace();
-
+                    return false;
                 }
-
             } catch (Exception e) {
                 e.printStackTrace();
+                return false;
             }
-
-            return null;
-
         }
 
         protected void onProgressUpdate(Integer... progress) {
-            if (progress[0] % 10 == 0) {
-                mBuilder.setProgress(100, progress[0], false);
-                mNotifyManager.notify(0, mBuilder.build());
-            }
+            mBuilder.setProgress(100, progress[0], false);
+            mBuilder.setContentText("Download in progress..." + progress[0] + "%");
+            mNotifyManager.notify(NOTIFICATION_ID, mBuilder.build());
         }
 
-        protected void onPostExecute(Void result) {
-            mBuilder.setContentText("Download complete");
-            mBuilder.setProgress(0, 0, false);
-            if (path != null && !path.isEmpty()) {
-                PendingIntent contentIntent = PendingIntent.getActivity(
-                        RingtoneActivity.this, 0, getOpenFileIntent(path), PendingIntent.FLAG_CANCEL_CURRENT);
-                mBuilder.setContentIntent(contentIntent);
-            }
-            mNotifyManager.notify(0, mBuilder.build());
-        }
+        protected void onPostExecute(Boolean result) {
+            if (showDownloadDone) {
+                mBuilder.setContentText("Download complete");
+                mBuilder.setProgress(0, 0, false);
+                if (result) {
+                    PendingIntent contentIntent = PendingIntent.getActivity(
+                            RingtoneActivity.this, 0, getOpenFileIntent(), PendingIntent.FLAG_CANCEL_CURRENT);
+                    mBuilder.setContentIntent(contentIntent);
 
+                }
+                mNotifyManager.notify(NOTIFICATION_ID, mBuilder.build());
+            } else {
+                mNotifyManager.cancel(NOTIFICATION_ID);
+                if (callback != null) callback.onComplete();
+            }
+            downloading = false;
+        }
     }
 }

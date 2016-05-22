@@ -15,6 +15,8 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
+import com.google.android.gms.ads.AdRequest;
+import com.google.android.gms.ads.AdView;
 import com.pkmmte.pkrss.Article;
 import com.pkmmte.pkrss.Callback;
 import com.pkmmte.pkrss.PkRSS;
@@ -61,21 +63,21 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
         Context context = view.getContext();
         recyclerView.setLayoutManager(new LinearLayoutManager(context));
         loadingView = view.findViewById(R.id.loading);
+        AdView adView = (AdView) view.findViewById(R.id.adView);
+        AdRequest adRequest = new AdRequest.Builder()
+                .setRequestAgent("android_studio:ad_template").build();
+        adView.loadAd(adRequest);
         return view;
     }
 
-    @Override
-    public void onStart() {
-        super.onStart();
-        if (context != null) {
-            PkRSS.with(context).load("http://megascripts.com/radio/?feed=rss2&amp%3Bcat=1").callback(this).async();
-        }
-    }
 
     @Override
     public void onAttach(Context context) {
         super.onAttach(context);
         this.context = context;
+        if (context != null) {
+            PkRSS.with(context).load("http://megascripts.com/radio/?feed=rss2&amp%3Bcat=1").callback(this).async();
+        }
     }
 
     @Override
@@ -96,13 +98,14 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
         for (Article article : newArticles) {
             Tone tone = new Tone();
             tone.name = article.getTitle();
-            if (tone.name == null || tone.name.isEmpty()) tone.name = "Unknown song";
-            if (article.getContent() != null) {
-                tone.url = Html.fromHtml(article.getContent()).toString();
-                if (!tone.url.contains(".mp3")) tone.url = null;
-            }
             tone.on = false;
             tone.progress = 0;
+            if (!(tone.name == null || tone.name.isEmpty()) && article.getContent() != null) {
+                tone.url = Html.fromHtml(article.getContent()).toString();
+                tone.filename = tone.name + ".mp3";
+                if (!tone.url.contains(".mp3")) tone.url = null;
+            }
+
             if (tone.url != null) toneList.add(tone);
         }
         adapter = new ToneRecyclerViewAdapter(toneList, new OnListFragmentInteractionListener() {

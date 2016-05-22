@@ -26,9 +26,9 @@
 
         <LinearLayout
             android:id="@+id/set_ringtone"
-            android:layout_marginTop="20dp"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
             android:background="?attr/selectableItemBackground"
             android:clickable="true"
             android:orientation="vertical">
@@ -76,9 +76,9 @@
                 android:background="@color/grey_divider" />
 
             <TextView
+                android:id="@+id/set_contact"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
-                android:id="@+id/set_contact"
                 android:layout_weight="1"
                 android:background="?attr/selectableItemBackground"
                 android:clickable="true"
@@ -141,5 +141,8 @@
 
         </LinearLayout>
 
+        <include
+            android:id="@+id/adView"
+            layout="@layout/ads_view" />
     </LinearLayout>
 </android.support.design.widget.CoordinatorLayout>
