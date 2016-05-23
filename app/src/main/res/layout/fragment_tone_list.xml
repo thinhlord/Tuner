@@ -26,6 +26,7 @@
         android:indeterminate="true" />
 
     <LinearLayout
+        android:visibility="gone"
         android:gravity="center"
         android:id="@+id/empty"
         android:layout_width="match_parent"

@@ -5,6 +5,7 @@ import android.app.PendingIntent;
 import android.content.ContentValues;
 import android.content.Context;
 import android.content.Intent;
+import android.database.Cursor;
 import android.media.RingtoneManager;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
@@ -122,8 +123,10 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
         }
         File f = new File(storeDir, tone.filename);
         if (f.exists()) {
-            setRingtone(tone, type);
-        } else if (type != TYPE_DOWNLOAD){
+            if (type == TYPE_DOWNLOAD)
+                Toast.makeText(RingtoneActivity.this, "Ringtone already downloaded", Toast.LENGTH_SHORT).show();
+            else setRingtone(tone, type);
+        } else if (type != TYPE_DOWNLOAD) {
             showDownloadDone = false;
             DownloadFileTask task = new DownloadFileTask();
             task.callback = new TaskCompleteCallback() {
@@ -150,9 +153,9 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
         File file = new File(storeDir, tone.filename);
         ContentValues values = new ContentValues();
         values.put(MediaStore.MediaColumns.DATA, file.getAbsolutePath());
-        values.put(MediaStore.MediaColumns.TITLE, tone.filename);
+        values.put(MediaStore.MediaColumns.TITLE, tone.name);
         values.put(MediaStore.MediaColumns.SIZE, file.length());
-        values.put(MediaStore.MediaColumns.MIME_TYPE, "audio/*");
+        values.put(MediaStore.MediaColumns.MIME_TYPE, "audio/mp3");
         values.put(MediaStore.Audio.Media.IS_RINGTONE, type == RingtoneManager.TYPE_RINGTONE);
         values.put(MediaStore.Audio.Media.IS_NOTIFICATION, type == RingtoneManager.TYPE_NOTIFICATION);
         values.put(MediaStore.Audio.Media.IS_ALARM, type == RingtoneManager.TYPE_ALARM);
@@ -160,7 +163,9 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
 
         //Insert it into the database
         Uri uri = MediaStore.Audio.Media.getContentUriForPath(file.getAbsolutePath());
-        Uri newUri = this.getContentResolver().insert(uri, values);
+        Uri newUri = getContentResolver().insert(uri, values);
+
+        if (newUri == null) newUri = Uri.withAppendedPath(uri, "" + getMediaIdFromFile(file));
 
         RingtoneManager.setActualDefaultRingtoneUri(
                 this,
@@ -238,11 +243,13 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
         if (requestCode == PICK_CONTACT_REQUEST) {
             if (resultCode == RESULT_OK) {
                 Uri contactUri = data.getData();
+
                 File file = new File(storeDir, tone.filename);
-                String value = Uri.fromFile(file).toString();
-                ContentValues values = new ContentValues(1);
-                values.put(ContactsContract.Contacts.CUSTOM_RINGTONE, value);
-                getContentResolver().update(contactUri, values, null, null);
+
+                ContentValues localContentValues = new ContentValues();
+                localContentValues.put(ContactsContract.Data.CUSTOM_RINGTONE, file.getAbsolutePath());
+                int i = getContentResolver().update(contactUri, localContentValues, null, null);
+                Log.d("đmm", i + "");
                 Toast.makeText(RingtoneActivity.this, String.format("Set %s as contact ringtone", tone.name), Toast.LENGTH_SHORT).show();
 
             }
@@ -254,6 +261,23 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
                 = (ConnectivityManager) getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo activeNetworkInfo = connectivityManager.getActiveNetworkInfo();
         return activeNetworkInfo != null && activeNetworkInfo.isConnected();
+    }
+
+    private long getMediaIdFromFile(File file) {
+        long videoId = -1;
+
+        Uri uri = MediaStore.Audio.Media.getContentUriForPath(file.getAbsolutePath());
+        String[] projection = {MediaStore.Audio.AudioColumns._ID};
+
+        Cursor cursor = getContentResolver().query(
+                uri, projection, MediaStore.Audio.AudioColumns.DATA + " LIKE ?", new String[]{file.getAbsolutePath()}, null);
+        if (cursor != null) {
+            cursor.moveToFirst();
+            int columnIndex = cursor.getColumnIndex(projection[0]);
+            videoId = cursor.getLong(columnIndex);
+            cursor.close();
+        }
+        return videoId;
     }
 
     interface TaskCompleteCallback {
