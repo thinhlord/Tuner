@@ -245,11 +245,24 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
                 Uri contactUri = data.getData();
 
                 File file = new File(storeDir, tone.filename);
+                ContentValues values = new ContentValues();
+                values.put(MediaStore.MediaColumns.DATA, file.getAbsolutePath());
+                values.put(MediaStore.MediaColumns.TITLE, tone.name);
+                values.put(MediaStore.MediaColumns.SIZE, file.length());
+                values.put(MediaStore.MediaColumns.MIME_TYPE, "audio/mp3");
+                values.put(MediaStore.Audio.Media.IS_RINGTONE, true);
+                values.put(MediaStore.Audio.Media.ARTIST, "Tuner");
 
+                //Insert it into the database
+                Uri uri = MediaStore.Audio.Media.getContentUriForPath(file.getAbsolutePath());
+                Uri newUri = getContentResolver().insert(uri, values);
+
+                if (newUri == null)
+                    newUri = Uri.withAppendedPath(uri, "" + getMediaIdFromFile(file));
                 ContentValues localContentValues = new ContentValues();
-                localContentValues.put(ContactsContract.Data.CUSTOM_RINGTONE, file.getAbsolutePath());
+                localContentValues.put(ContactsContract.Data.CUSTOM_RINGTONE, newUri.toString());
                 int i = getContentResolver().update(contactUri, localContentValues, null, null);
-                Log.d("đmm", i + "");
+                Log.d("Updated", i + "");
                 Toast.makeText(RingtoneActivity.this, String.format("Set %s as contact ringtone", tone.name), Toast.LENGTH_SHORT).show();
 
             }
