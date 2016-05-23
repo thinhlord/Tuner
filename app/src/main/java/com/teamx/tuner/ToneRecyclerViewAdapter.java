@@ -25,7 +25,7 @@ public class ToneRecyclerViewAdapter extends RecyclerView.Adapter<ToneRecyclerVi
     @Override
     public ViewHolder onCreateViewHolder(ViewGroup parent, int viewType) {
         View view = LayoutInflater.from(parent.getContext())
-                .inflate(R.layout.fragment_tone, parent, false);
+                .inflate(R.layout.adapter_tone, parent, false);
         return new ViewHolder(view);
     }
 

@@ -14,7 +14,7 @@
         android:layout_above="@+id/adView"
         app:layoutManager="LinearLayoutManager"
         tools:context="com.teamx.tuner.ToneFragment"
-        tools:listitem="@layout/fragment_tone" />
+        tools:listitem="@layout/adapter_tone" />
 
     <ProgressBar
         android:id="@+id/loading"

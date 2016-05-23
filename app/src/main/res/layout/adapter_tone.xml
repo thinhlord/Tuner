@@ -4,10 +4,11 @@
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_gravity="center"
-    android:layout_marginBottom="5dp"
+    android:layout_marginBottom="1dp"
     android:layout_marginLeft="10dp"
     android:layout_marginRight="10dp"
-    android:layout_marginTop="5dp"
+    android:layout_marginTop="1dp"
+    card_view:contentPaddingBottom="-2dp"
     card_view:cardCornerRadius="4dp">
 
     <LinearLayout
@@ -50,12 +51,18 @@
 
         </LinearLayout>
 
-        <ProgressBar
-            android:id="@+id/progressBar"
-            style="?android:attr/progressBarStyleHorizontal"
+        <FrameLayout
             android:layout_width="match_parent"
-            android:layout_height="4dp"
-            android:progressDrawable="@drawable/custom_progress_bar" />
+            android:layout_height="4dp">
+
+            <ProgressBar
+                android:id="@+id/progressBar"
+                style="?android:attr/progressBarStyleHorizontal"
+                android:layout_width="match_parent"
+                android:layout_height="20dp"
+                android:layout_gravity="center"
+                android:progressDrawable="@drawable/custom_progress_bar" />
+        </FrameLayout>
 
     </LinearLayout>
 
