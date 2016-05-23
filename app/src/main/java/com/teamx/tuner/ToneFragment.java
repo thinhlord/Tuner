@@ -8,6 +8,7 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.os.Bundle;
 import android.os.Handler;
+import android.preference.PreferenceManager;
 import android.support.v4.app.Fragment;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
@@ -17,8 +18,10 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.Toast;
 
+import com.google.android.gms.ads.AdListener;
 import com.google.android.gms.ads.AdRequest;
 import com.google.android.gms.ads.AdView;
+import com.google.android.gms.ads.InterstitialAd;
 import com.pkmmte.pkrss.Article;
 import com.pkmmte.pkrss.Callback;
 import com.pkmmte.pkrss.PkRSS;
@@ -38,6 +41,8 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
     int pos = -1;
     View emptyView;
 
+    InterstitialAd mInterstitialAd;
+
     public ToneFragment() {
     }
 
@@ -49,13 +54,31 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
         return fragment;
     }
 
+
+    public boolean shouldShowAds(){
+        int count = PreferenceManager.getDefaultSharedPreferences(getContext()).getInt("adsCount", 0);
+        count ++;
+        PreferenceManager.getDefaultSharedPreferences(getContext()).edit().putInt("adsCount", count).apply();
+        return count % 2 == 0;
+    }
+
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-//        if (getArguments() != null) {
-//
-//        }
+        mInterstitialAd = new InterstitialAd(getContext());
+        mInterstitialAd.setAdUnitId("ca-app-pub-3940256099942544/1033173712");
+
+        requestNewInterstitial();
+    }
+
+    void requestNewInterstitial() {
+        AdRequest adRequest = new AdRequest.Builder()
+                .addTestDevice("SEE_YOUR_LOGCAT_TO_GET_YOUR_DEVICE_ID")
+                .build();
+
+        mInterstitialAd.loadAd(adRequest);
     }
 
     @Override
@@ -136,10 +159,25 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
         }
         adapter = new ToneRecyclerViewAdapter(toneList, new OnListFragmentInteractionListener() {
             @Override
-            public void onAddToneClick(Tone item) {
-                Intent intent = new Intent(context, RingtoneActivity.class);
-                intent.putExtra("Tone", item);
-                startActivity(intent);
+            public void onAddToneClick(final Tone item) {
+                if (!shouldShowAds()) {
+                    onToneSelected(item);
+                }
+                else {
+                    if (mInterstitialAd.isLoaded()) {
+                        mInterstitialAd.show();
+                        mInterstitialAd.setAdListener(new AdListener() {
+                            @Override
+                            public void onAdClosed() {
+                                onToneSelected(item);
+                                requestNewInterstitial();
+                            }
+                        });
+                    }
+                    else {
+                        onToneSelected(item);
+                    }
+                }
             }
 
             @Override
@@ -178,6 +216,14 @@ public class ToneFragment extends Fragment implements Callback, MediaPlayer.OnPr
         recyclerView.setAdapter(adapter);
 
     }
+
+
+    void onToneSelected(Tone tone){
+        Intent intent = new Intent(context, RingtoneActivity.class);
+        intent.putExtra("Tone", tone);
+        startActivity(intent);
+    }
+
 
     @Override
     public void onLoadFailed() {
