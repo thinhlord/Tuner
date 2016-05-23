@@ -31,7 +31,9 @@ import com.google.android.gms.ads.AdView;
 
 import java.io.File;
 import java.io.FileOutputStream;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
@@ -44,7 +46,7 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
 
     static boolean downloading = false;
     Tone tone = null;
-    String storeDir = Environment.getExternalStorageDirectory().toString() + "/Tuner/Ringtone";
+    String storeDir = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_RINGTONES).getAbsolutePath();
     boolean showDownloadDone = true;
 
     public Intent getOpenFileIntent() {
@@ -245,24 +247,15 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
                 Uri contactUri = data.getData();
 
                 File file = new File(storeDir, tone.filename);
-                ContentValues values = new ContentValues();
-                values.put(MediaStore.MediaColumns.DATA, file.getAbsolutePath());
-                values.put(MediaStore.MediaColumns.TITLE, tone.name);
-                values.put(MediaStore.MediaColumns.SIZE, file.length());
-                values.put(MediaStore.MediaColumns.MIME_TYPE, "audio/mp3");
-                values.put(MediaStore.Audio.Media.IS_RINGTONE, true);
-                values.put(MediaStore.Audio.Media.ARTIST, "Tuner");
+                Cursor cursor = getContentResolver().query(contactUri, null, null, null, null);
+                if (cursor != null && cursor.moveToFirst()) {
+                    int idx = cursor.getColumnIndex(ContactsContract.Contacts._ID);
+                    int contactID = cursor.getInt(idx);
+                    cursor.close();
 
-                //Insert it into the database
-                Uri uri = MediaStore.Audio.Media.getContentUriForPath(file.getAbsolutePath());
-                Uri newUri = getContentResolver().insert(uri, values);
+                    assignRingtoneToContact(this, file, contactID);
+                }
 
-                if (newUri == null)
-                    newUri = Uri.withAppendedPath(uri, "" + getMediaIdFromFile(file));
-                ContentValues localContentValues = new ContentValues();
-                localContentValues.put(ContactsContract.Data.CUSTOM_RINGTONE, newUri.toString());
-                int i = getContentResolver().update(contactUri, localContentValues, null, null);
-                Log.d("Updated", i + "");
                 Toast.makeText(RingtoneActivity.this, String.format("Set %s as contact ringtone", tone.name), Toast.LENGTH_SHORT).show();
 
             }
@@ -291,6 +284,62 @@ public class RingtoneActivity extends BaseActivity implements NavigationView.OnN
             cursor.close();
         }
         return videoId;
+    }
+
+    public static void assignRingtoneToContact(Context context, File file, int contactID) {
+        ContentValues values = new ContentValues();
+        boolean isRingTone = false;
+
+        String[] columns = {
+                MediaStore.Audio.Media.DATA,
+                MediaStore.Audio.Media._ID,
+                MediaStore.Audio.Media.TITLE,
+                MediaStore.Audio.Media.DISPLAY_NAME,
+                MediaStore.Audio.Media.IS_RINGTONE
+        };
+
+        Cursor cursor = context.getContentResolver().query(MediaStore.Audio.Media.EXTERNAL_CONTENT_URI, columns, MediaStore.Audio.Media.DATA + " = '" + file.getAbsolutePath() + "'", null, null);
+        if (cursor != null) {
+            int idColumn = cursor.getColumnIndex(MediaStore.Audio.Media._ID);
+            int fileColumn = cursor.getColumnIndex(MediaStore.Audio.Media.DATA);
+            int ringtoneColumn = cursor.getColumnIndex(MediaStore.Audio.Media.IS_RINGTONE);
+
+            while (cursor.moveToNext()) {
+                String audioFilePath = cursor.getString(fileColumn);
+                if (cursor.getString(ringtoneColumn) != null && cursor.getString(ringtoneColumn).equals("1")) {
+                    Uri hasUri = MediaStore.Audio.Media.getContentUriForPath(audioFilePath);
+                    Uri fullUri = Uri.withAppendedPath(hasUri, cursor.getString(idColumn));
+                    isRingTone = true;
+                    values.put(ContactsContract.Contacts.CUSTOM_RINGTONE, fullUri.toString());
+                }
+            }
+            cursor.close();
+
+            if (!isRingTone) {
+                context.sendBroadcast(new Intent(Intent.ACTION_MEDIA_SCANNER_SCAN_FILE));
+
+                Uri oldUri = MediaStore.Audio.Media.getContentUriForPath(file.getAbsolutePath());
+                ContentValues Newvalues = new ContentValues();
+                Uri newUri;
+                String uriString;
+                context.getContentResolver().delete(oldUri, MediaStore.MediaColumns.DATA + "=\"" + file.getAbsolutePath() + "\"", null);
+                Newvalues.put(MediaStore.MediaColumns.DATA, file.getAbsolutePath());
+                Newvalues.put(MediaStore.MediaColumns.TITLE, file.getName());
+                Newvalues.put(MediaStore.MediaColumns.SIZE, file.length());
+                Newvalues.put(MediaStore.MediaColumns.MIME_TYPE, "audio/mp3");
+                Newvalues.put(MediaStore.Audio.Media.IS_RINGTONE, true);
+
+                Uri uri = MediaStore.Audio.Media.getContentUriForPath(file.getAbsolutePath());
+                newUri = context.getContentResolver().insert(uri, Newvalues);
+                uriString = newUri.toString();
+                values.put(ContactsContract.Contacts.CUSTOM_RINGTONE, uriString);
+                Log.i("LOG", "uriString: " + uriString);
+            }
+
+        }
+
+        int count = context.getContentResolver().update(ContactsContract.Contacts.CONTENT_URI, values, ContactsContract.Contacts._ID + " = " + contactID, null);
+        Log.i("LOG", "Update: " + count);
     }
 
     interface TaskCompleteCallback {
